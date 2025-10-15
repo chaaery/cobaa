@@ -1,31 +1,26 @@
 # Sapa Menyawa ESP-Now
 
 ## Deskripsi Umum
-Proyek ini menggunakan **ESP32 dengan ESP-NOW** untuk komunikasi nirkabel antar perangkat.  
-Setiap ESP memiliki **alamat MAC** yang digunakan untuk mengirim dan menerima perintah dari ESP lain dan menerima perintah dari Serial/Laptop.
-
-Proyek ini memiliki **3 perintah utama**:
-1. **HALO**
-2. **CEK** 
-3. **JAWAB** 
+Proyek ini merupakan task-3 dari intern programming virose dimana merupakakan implementasi proyek untuk membangun sistem komunikasi nirkabel antar perangkat ESP32 menggunakan protokol ESP-NOW. Dalam proyek ini, setiap ESP32 memiliki identitas unik yang ditentukan berdasarkan alamat MAC. Identitas ini digunakan untuk:
+1. Mengirim pesan sapaan antar-perangkat (contoh: perintah HALO).
+2. Memeriksa status perangkat lain (contoh: perintah CEK).
+3. Menangani tanggapan atau jawaban dari perangkat tujuan (contoh: perintah JAWAB).
 
 ---
 
 ## Struktur src pada file
-project/
-│
-├── main.h       → Deklarasi fungsi, array MAC, enum, konstanta
-├── main.cpp     → Setup ESP32, loop utama, TODO 1: Cetak nama pengguna
-├── utility.cpp  → Logika baca serial & proses perintah, TODO 2 & 3
+- main.h      → Deklarasi fungsi, array MAC, enum, konstanta
+- main.cpp     → Setup ESP32, loop utama, TODO 1: Cetak nama pengguna
+- utility.cpp  → Logika baca serial & proses perintah, TODO 2 & 3
 
-## main.h
+# main.h
 File ini adalah header utama, berisi:
 - Konstanta: MAC_ADDRESS_TOTAL, MAC_ADDRESS_LENGTH, BUFFER_SIZE
 - Array MAC: mac_addresses (alamat ESP), mac_names (nama ESP)
 - Enum: ADDRESS_ASSIGNMENT (index MAC), COMMAND (HALO, CEK, JAWAB)
 - Deklarasi Fungsi: inisialisasi ESP-NOW, baca serial, proses perintah, callback
 
-## main.cpp
+# main.cpp
 File ini berfungsi sebagai entry point program. Tugas utamanya:
 Menentukan identitas ESP 
 Menginisialisasi ESP-NOW melalui fungsi `mulai_esp_now()`
@@ -84,7 +79,7 @@ Output yang diharapkan berupa
 6. Reset buffer jika header salah atau buffer penuh (overflow).
 
 **KODE**
-```
+```cpp
 void baca_serial(void (*callback)(const uint8_t *data, int len)) {
     static uint8_t buffer[BUFFER_SIZE];
     static int index = 0;
