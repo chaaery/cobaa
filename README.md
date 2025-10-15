@@ -117,7 +117,7 @@ void baca_serial(void (*callback)(const uint8_t *data, int len)) {
 4. Tentukan `nama_tujuan`:
    - Jika index valid → gunakan `mac_names[index_tujuan]`
    - Jika tidak valid → "Unknown"
-5. Gunakan strcpy((char *)&kirim[1], pesan.c_str()) untuk menyalin string ke buffer ESP-NOW.
+5. Gunakan `strcpy((char *)&kirim[1], pesan.c_str())` untuk menyalin string ke buffer ESP-NOW.
 6. Kirim paket menggunakan `esp_now_send()`, panjang paket = `1 + pesan.length()` (+1 untuk byte perintah di index 0)
 7. Tampilkan pesan di Serial jika perintah adalah JAWAB.
 
