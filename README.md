@@ -39,7 +39,6 @@ void setup() {
     mulai_esp_now(mac_index_ku);  
 
     // TODO 1: Cetak nama pengguna sesuai MAC index
-    Serial.print("Namaku ");  
     Serial.println(mac_index_to_names(mac_index_ku));  
     Serial.println("Menunggu perintah...");
 }
@@ -59,11 +58,10 @@ void loop() {
 5. Tampilkan nama perangkat di serial monitor.
    
 ```cpp
-Serial.print("Namaku ");
 Serial.println(mac_index_to_names(mac_index_ku));
 ```
 Output yang diharapkan berupa
-`Namaku Africha Sekar Wangi`
+`Africha Sekar Wangi`
 
 ## utility.cpp
 - Di dalam file ini mengandung fungsi pendukung utama untuk:
@@ -82,17 +80,20 @@ Output yang diharapkan berupa
 **KODE**
 ```cpp
 void baca_serial(void (*callback)(const uint8_t *data, int len)) {
-    static uint8_t buffer[BUFFER_SIZE];
-    static int index = 0;
+    // TODO 2: implementasi kode buat nerima perintah dari serial
+    static uint8_t buffer[BUFFER_SIZE];   //menyimpan data yang masuk dari Serial
+    static int index = 0;   //Index saat ini dalam buffer (berapa byte yang sudah diterima)
 
     while (Serial.available()) {
-        uint8_t byte_in = Serial.read();
-        buffer[index++] = byte_in;
+        uint8_t byte_in = Serial.read();  
+        buffer[index++] = byte_in; 
 
         if (index >= 4) {
+            // Cek kalau sudah ada minimal 4 byte (header 3 byte + panjang data 1 byte)
             if (buffer[0] == 0xFF && buffer[1] == 0xFF && buffer[2] == 0x00) {
-                uint8_t panjang_data = buffer[3];
-                int total_paket = 4 + panjang_data;
+                // Cek apakah 3 byte pertama adalah HEADER yang benar
+                uint8_t panjang_data = buffer[3]; 
+                int total_paket = 4 + panjang_data; // Total paket = 3 byte header + 1 byte panjang data + byte data 
 
                 if (index >= total_paket) {
                     callback(&buffer[4], panjang_data);
