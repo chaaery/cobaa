@@ -1,7 +1,7 @@
-# Sapa Menyawa ESP-Now
+# Sapa Menyawa ESP-NOW
 
 ## Deskripsi Umum
-Proyek ini merupakan task-3 dari intern programming virose dimana merupakakan implementasi proyek untuk membangun sistem komunikasi nirkabel antar perangkat ESP32 menggunakan protokol ESP-NOW. Dalam proyek ini, setiap ESP32 memiliki identitas unik yang ditentukan berdasarkan alamat MAC. Identitas ini digunakan untuk:
+Proyek ini merupakan task-3 dari intern programming virose yang merupakan implementasi proyek untuk membangun sistem komunikasi nirkabel antar perangkat ESP32 menggunakan protokol ESP-NOW. Dalam proyek ini, setiap ESP32 memiliki identitas unik yang ditentukan berdasarkan alamat MAC. Identitas ini digunakan untuk:
 1. Mengirim pesan sapaan antar-perangkat (contoh: perintah HALO).
 2. Memeriksa status perangkat lain (contoh: perintah CEK).
 3. Menangani tanggapan atau jawaban dari perangkat tujuan (contoh: perintah JAWAB).
