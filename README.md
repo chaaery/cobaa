@@ -9,9 +9,9 @@ Proyek ini merupakan task-3 dari intern programming virose yang merupakan implem
 ---
 
 ## Struktur src pada file
-- main.h      → Deklarasi fungsi, array MAC, enum, konstanta
-- main.cpp     → Setup ESP32, loop utama, TODO 1: Cetak nama pengguna
-- utility.cpp  → Logika baca serial & proses perintah, TODO 2 & 3
+- main.h      → Deklarasi fungsi, array MAC, enum, konstanta, dan array MAC + nama perangkat.
+- main.cpp     → Setup ESP32, loop utama, TODO 1: Cetak nama pengguna berdasarkan MAC
+- utility.cpp  → Logika baca serial & proses perintah, TODO 2 & 3 baca paket dari serial, cek header & panjang data, proses perintah `HALO, CEK, JAWAB`, kirim/terima pesan via ESP-NOW.
 
 # main.h
 File ini adalah header utama, berisi:
@@ -22,10 +22,10 @@ File ini adalah header utama, berisi:
 
 # main.cpp
 File ini berfungsi sebagai entry point program. Tugas utamanya:
-Menentukan identitas ESP 
-Menginisialisasi ESP-NOW melalui fungsi `mulai_esp_now()`
-Memanggil fungsi untuk menunggu perintah dari Serial
-Melakukan loop utama untuk terus memeriksa input Serial
+- Menentukan identitas ESP 
+- Menginisialisasi ESP-NOW melalui fungsi `mulai_esp_now()`
+- Memanggil fungsi untuk menunggu perintah dari Serial
+- Melakukan loop utama untuk terus memeriksa input Serial
 
 **KODE**
 ```cpp
@@ -57,6 +57,7 @@ void loop() {
 3. Panggil fungsi `mulai_esp_now(mac_index_ku)` untuk menginisialisasi ESP-NOW dengan alamat MAC yang telah dipilih.
 4. Gunakan fungsi mac_index_to_names(int mac_index) untuk mengonversi indeks MAC menjadi nama perangkat
 5. Tampilkan nama perangkat di serial monitor.
+   
 ```cpp
 Serial.print("Namaku ");
 Serial.println(mac_index_to_names(mac_index_ku));
