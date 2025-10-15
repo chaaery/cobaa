@@ -1,4 +1,188 @@
-Proyek Sapa Menyapa ESP-now  dibagi menjadi 3 perintah utama:
-1. Halo
-2. Cek
-3. Jawan
+# Sapa Menyawa ESP-Now
+
+## Deskripsi Umum
+Proyek ini menggunakan **ESP32 dengan ESP-NOW** untuk komunikasi nirkabel antar perangkat.  
+Setiap ESP memiliki **alamat MAC** yang digunakan untuk mengirim dan menerima perintah dari ESP lain dan menerima perintah dari Serial/Laptop.
+
+Proyek ini memiliki **3 perintah utama**:
+1. **HALO**
+2. **CEK** 
+3. **JAWAB** 
+
+---
+
+## Struktur src pada file
+project/
+│
+├── main.h       → Deklarasi fungsi, array MAC, enum, konstanta
+├── main.cpp     → Setup ESP32, loop utama, TODO 1: Cetak nama pengguna
+├── utility.cpp  → Logika baca serial & proses perintah, TODO 2 & 3
+
+## main.h
+File ini adalah header utama, berisi:
+- Konstanta: MAC_ADDRESS_TOTAL, MAC_ADDRESS_LENGTH, BUFFER_SIZE
+- Array MAC: mac_addresses (alamat ESP), mac_names (nama ESP)
+- Enum: ADDRESS_ASSIGNMENT (index MAC), COMMAND (HALO, CEK, JAWAB)
+- Deklarasi Fungsi: inisialisasi ESP-NOW, baca serial, proses perintah, callback
+
+## main.cpp
+File ini berfungsi sebagai entry point program. Tugas utamanya:
+Menentukan identitas ESP 
+Menginisialisasi ESP-NOW melalui fungsi `mulai_esp_now()`
+Memanggil fungsi untuk menunggu perintah dari Serial
+Melakukan loop utama untuk terus memeriksa input Serial
+
+**KODE**
+```cpp
+#include "main.h"
+
+// TODO: Ganti dengan MAC index perangkat pengguna
+const int mac_index_ku = 4; 
+void setup() {
+    Serial.begin(115200);  
+    Serial.println("Menyalakan ESP-NOW");
+    mulai_esp_now(mac_index_ku);  
+
+    // TODO 1: Cetak nama pengguna sesuai MAC index
+    Serial.print("Namaku ");  
+    Serial.println(mac_index_to_names(mac_index_ku));  
+    Serial.println("Menunggu perintah...");
+}
+
+void loop() {
+    if (Serial.available()) {  
+        baca_serial(callback_data_serial);  
+    }
+}
+```
+### TODO 1 - Cetak Nama Pengguna
+1. Di dalam file main.h, terdapat array mac_addresses yang memuat daftar alamat MAC untuk setiap perangkat. Setiap alamat MAC dikaitkan dengan nama pemilik atau identitas perangkat melalui array mac_names.
+2. Pilih alamat MAC yang digunakan untuk perangkat ini yaitu alamat MAC ke-4 dengan nilai
+   `{0x24, 0x0A, 0xC4, 0x0A, 0x10, 0x11}`yang sesuai dengan nama saya yaitu "Africha Sekar Wangi".
+3. Panggil fungsi `mulai_esp_now(mac_index_ku)` untuk menginisialisasi ESP-NOW dengan alamat MAC yang telah dipilih.
+4. Gunakan fungsi mac_index_to_names(int mac_index) untuk mengonversi indeks MAC menjadi nama perangkat
+5. Tampilkan nama perangkat di serial monitor.
+```cpp
+Serial.print("Namaku ");
+Serial.println(mac_index_to_names(mac_index_ku));
+```
+Output yang diharapkan berupa
+`Namaku Africha Sekar Wangi`
+
+## utility.cpp
+- Di dalam file ini mengandung fungsi pendukung utama untuk:
+- Membaca data dari Serial
+- Memproses perintah yang diterima baik dari Serial maupun ESP-NOW
+- Mengatur callback penerimaan dan pengiriman data ESP-NOW
+
+### TODO 2 - Baca Serial
+1. Gunakan `static uint8_t buffer[BUFFER_SIZE]` untuk menyimpan data yang masuk.
+2. Gunakan `static int index` untuk menandai posisi byte berikutnya dalam buffer.
+3. Cek header paket: 3 byte pertama harus `0xFF, 0xFF, 0x00.`
+4. Byte ke-4 menandai panjang payload data.
+5. Setelah seluruh paket diterima, panggil callback dengan payload data.
+6. Reset buffer jika header salah atau buffer penuh (overflow).
+
+**KODE**
+```
+void baca_serial(void (*callback)(const uint8_t *data, int len)) {
+    static uint8_t buffer[BUFFER_SIZE];
+    static int index = 0;
+
+    while (Serial.available()) {
+        uint8_t byte_in = Serial.read();
+        buffer[index++] = byte_in;
+
+        if (index >= 4) {
+            if (buffer[0] == 0xFF && buffer[1] == 0xFF && buffer[2] == 0x00) {
+                uint8_t panjang_data = buffer[3];
+                int total_paket = 4 + panjang_data;
+
+                if (index >= total_paket) {
+                    callback(&buffer[4], panjang_data);
+                    index = 0;
+                }
+            } else {
+                index = 0;
+            }
+        }
+
+        if (index >= BUFFER_SIZE) index = 0;
+    }
+}
+```
+### TODO 3 - Proses Perintah
+1. `data[0]` → perintah: HALO, CEK, JAWAB
+2. `data[1]` → index MAC tujuan (jika tersedia)
+3. Tentukan `nama_asal`:
+   - Dari ESP → gunakan `mac_index_to_names(index_mac_address_asal)`
+   - Dari Serial → tampilkan "Laptop"
+4. Tentukan `nama_tujuan`:
+   - Jika index valid → gunakan `mac_names[index_tujuan]`
+   - Jika tidak valid → "Unknown"
+5. Gunakan strcpy((char *)&kirim[1], pesan.c_str()) untuk menyalin string ke buffer ESP-NOW.
+6. Kirim paket menggunakan `esp_now_send()`, panjang paket = `1 + pesan.length()` (+1 untuk byte perintah di index 0)
+7. Tampilkan pesan di Serial jika perintah adalah JAWAB.
+
+**KODE**
+```cpp
+void process_perintah(const uint8_t *data, int len, int index_mac_address_asal) {
+    // TODO 3: implementasi kode buat processing perintah
+    uint8_t command = data[0];  // byte pertama = jenis perintah
+    int index_tujuan = (len > 1) ? data[1] : -1; // byte kedua = tujuan
+
+    String nama_asal = (index_mac_address_asal == -1) ? "Laptop" : mac_index_to_names(index_mac_address_asal);
+    String nama_tujuan = (index_tujuan >= 0 && index_tujuan < MAC_ADDRESS_TOTAL) ? mac_names[index_tujuan] : "Unknown";
+
+    switch (command) {
+        case HALO: {
+            if (index_mac_address_asal == -1) {
+                // Dari serial (Laptop)
+                String pesan = "Halo " + nama_tujuan + " Aku " + String(mac_names[mac_index_ku]);
+                uint8_t kirim[BUFFER_SIZE];
+                kirim[0] = HALO;
+                strcpy((char *)&kirim[1], pesan.c_str());
+                esp_now_send(mac_addresses[index_tujuan], kirim, 1 + pesan.length());
+            } else {
+                // Dari ESP-NOW
+                String pesan = "Halo Juga " + nama_asal + " Aku " + String(mac_names[mac_index_ku]);
+                uint8_t kirim[BUFFER_SIZE];
+                kirim[0] = JAWAB;
+                strcpy((char *)&kirim[1], pesan.c_str());
+                esp_now_send(mac_addresses[index_mac_address_asal], kirim, 1 + pesan.length());
+            }
+            break;
+        }
+
+        case CEK: {
+            if (index_mac_address_asal == -1) {
+                // Dari Serial
+                String pesan = nama_tujuan + String(" ini ") + String(mac_names[mac_index_ku]) + " apa kamu disana?";
+                uint8_t kirim[BUFFER_SIZE];
+                kirim[0] = CEK;
+                strcpy((char *)&kirim[1], pesan.c_str());
+                esp_now_send(mac_addresses[index_tujuan], kirim, 1 + pesan.length());
+            } else {
+                // Dari ESP-NOW
+                String pesan = "Iya Aku " + nama_asal + " Disini - " + String(mac_names[mac_index_ku]);
+                uint8_t kirim[BUFFER_SIZE];
+                kirim[0] = JAWAB;
+                strcpy((char *)&kirim[1], pesan.c_str());
+                esp_now_send(mac_addresses[index_mac_address_asal], kirim, 1 + pesan.length());
+            }
+            break;
+        }
+
+        case JAWAB: {
+            // Hanya dari ESP-NOW, tampilkan di Serial
+            String pesan = String((char *)&data[1]);
+            Serial.println("Pesan diterima: " + pesan);
+            break;
+        }
+
+        default:
+            Serial.println("Perintah tidak dikenali!");
+            break;
+    }
+}
+```
