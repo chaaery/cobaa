@@ -1,185 +1,469 @@
-# Sapa Menyawa ESP-NOW
+# Cross PLatform FIle Transfer ESP-NOW
 
 ## Deskripsi Umum
-Proyek ini merupakan task-3 dari intern programming virose yang merupakan implementasi proyek untuk membangun sistem komunikasi nirkabel antar perangkat ESP32 menggunakan protokol ESP-NOW. Dalam proyek ini, setiap ESP32 memiliki identitas unik yang ditentukan berdasarkan alamat MAC. Identitas ini digunakan untuk:
-1. Mengirim pesan sapaan antar-perangkat (contoh: perintah HALO).
-2. Memeriksa status perangkat lain (contoh: perintah CEK).
-3. Menangani tanggapan atau jawaban dari perangkat tujuan (contoh: perintah JAWAB).
+Program ini dibuat untuk mentransfer file JSON dari laptop ke ESP-Receiver melalui ESP-Bridge menggunakan ESP-NOW. Program harus memecah file JSON menjadi beberapa chunk agar sesuai batasan ESP-NOW 250 byte per packet, kemudian menyusun kembali di ESP-Receiver dan menampilkan data ke serial monitor.
 
----
+## Struktur proyek
+try task-4
+│
+├── .vscode/
+│   ├── c_cpp_properties.json
+│   ├── extensions.json
+│   └── launch.json
+│
+├── EspBridge/
+│   ├── pio/
+│   ├── .vscode/
+│   ├── src/
+│   │   ├── EspBridge.h
+│   │   └── main.cpp
+│   ├── .gitignore
+│   └── platformio.ini
+│
+├── EspReceiver/
+│   ├── pio/
+│   ├── .vscode/
+│   ├── src/
+│   │   ├── EspReceiver.h
+│   │   └── main.cpp
+│   ├── .gitignore
+│   └── platformio.ini
+│
+├── include/
+│   └── README
+│
+├── laptop/
+│   ├── build/
+│   ├── data/
+│   │   └── data.json
+│   ├── src/
+│   │   ├── Laptop.h
+│   │   ├── Laptop.cpp
+│   │   └── main.cpp
+│   └── CMakeLists.txt
+│
+└── lib/
+    └── README
+    
+# Alur Program
+Laptop:
+- Membaca JSON dari `data.json` menggunakan `Laptop::readJSON()`.
+- Memecah data menjadi chunk dengan `Laptop::splitData()`. Khusus DESKRIPSI, dipisahkan per kata agar tidak lebih dari 85 karakter per chunk, menjaga kata tidak terpotong.
+- Mengirim setiap chunk ke ESP-Bridge via serial `(Laptop::sendToESPBridge())`.
+ESP-Bridge:
+- Menerima serial dari Laptop `(ESPBridge::receiveSerial())`.
+- Meneruskan setiap chunk ke ESP-Receiver melalui ESP-NOW `(ESPBridge::sendESPNow())`.
+ESP-Receiver:
+- Menerima chunk melalui ESP-NOW di callback `onDataReceived()`.
+- Menyimpan semua chunk ke memory sementara `(parseMessage())`.
+- Setelah menerima semua chunk `(|END)`, menyusun kembali data menjadi JSON utuh dan menampilkan di Serial Monitor `(printJSON())`.
 
-## Struktur src pada file
-- main.h      → Deklarasi fungsi, array MAC, enum, konstanta, dan array MAC + nama perangkat.
-- main.cpp     → Setup ESP32, loop utama, TODO 1: Cetak nama pengguna berdasarkan MAC
-- utility.cpp  → Logika baca serial & proses perintah, TODO 2 & 3 baca paket dari serial, cek header & panjang data, proses perintah `HALO, CEK, JAWAB`, kirim/terima pesan via ESP-NOW.
-
-# main.h
-File ini adalah header utama, berisi:
-- Konstanta: MAC_ADDRESS_TOTAL, MAC_ADDRESS_LENGTH, BUFFER_SIZE
-- Array MAC: mac_addresses (alamat ESP), mac_names (nama ESP)
-- Enum: ADDRESS_ASSIGNMENT (index MAC), COMMAND (HALO, CEK, JAWAB)
-- Deklarasi Fungsi: inisialisasi ESP-NOW, baca serial, proses perintah, callback
-
-# main.cpp
-File ini berfungsi sebagai entry point program. Tugas utamanya:
-- Menentukan identitas ESP 
-- Menginisialisasi ESP-NOW melalui fungsi `mulai_esp_now()`
-- Memanggil fungsi untuk menunggu perintah dari Serial
-- Melakukan loop utama untuk terus memeriksa input Serial
-
-**KODE**
+# Bagian Laptop
+**Laptop.h**
 ```cpp
-#include "main.h"
+#pragma once
+#include <string>
+#include <vector>
 
-// TODO: Ganti dengan MAC index perangkat pengguna
-const int mac_index_ku = 4; 
+class Laptop {
+public:
+    Laptop(const std::string& jsonFile);
+
+    void readJSON();        // Baca JSON dari file
+    void splitData();       // Pecah menjadi chunk (per kata max 85)
+    void sendToESPBridge(); // Kirim ke ESP-Bridge via serial
+
+private:
+    std::string filename;
+    std::string nama;
+    std::string jurusan;
+    int umur;
+    std::string deskripsi;
+    std::vector<std::string> chunks;
+};
+```
+Di dalam Laptop.h, terdapat tiga fungsi utama:
+1. `readJSON()` → membaca isi file .json dan mengambil nilai-nilai seperti nama, jurusan, umur, dan deskripsi.
+2. `splitData()` → memecah isi data, terutama bagian deskripsi, menjadi beberapa potongan teks berukuran lebih kecil (maksimal sekitar 85 karakter) supaya aman dikirim ke ESP.
+3. `sendToESPBridge()` → mengirimkan potongan-potongan data tersebut ke ESP-Bridge melalui port serial.
+   
+**Laptop.cpp**
+Alur Kerja
+1.Buka file JSON → ambil nama, jurusan, umur, deskripsi.
+2.Pecah data menjadi chunk, terutama deskripsi agar ≤ 85 karakter per chunk.
+3.Kirim chunk satu per satu ke ESP-Bridge melalui serial.
+
+```cpp
+#include "Laptop.h"
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <vector>
+#include <cctype>
+#include <windows.h>
+```
+Laptop.h → Header milik class ini sendiri yang berisi deklarasi fungsi dan variabel.
+fstream → Untuk membaca file (dalam hal ini file .json).
+iostream → Untuk menampilkan pesan ke terminal (cout, cerr).
+sstream → Untuk membaca teks dari memori, seperti parsing data.
+vector → Menyimpan potongan data (chunks) hasil pemecahan.
+cctype → Digunakan untuk pengecekan karakter seperti isspace().
+windows.h → Library Windows yang menyediakan fungsi komunikasi serial (CreateFile, WriteFile, Sleep).
+```cpp
+Laptop::Laptop(const std::string& jsonFile) : filename(jsonFile) {}
+```
+Konstruktor menerima path file JSON (jsonFile) dan menyimpannya di member filename.
+```cpp
+void Laptop::readJSON() {
+    std::ifstream file(filename);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string jsonContent = buffer.str();
+    
+    auto getValue = [&](const std::string& key) -> std::string { /* ambil value */ };
+    nama = getValue("nama");
+    jurusan = getValue("jurusan");
+    umur = std::stoi(getValue("umur"));
+    deskripsi = getValue("deskripsi");
+}
+```
+Fungsi readJSON() membaca seluruh file JSON dan mengambil nilai tiap key, menggunakan fungsi lambda getValue(). Membuka file JSON. Jika gagal, menampilkan error, Membaca seluruh konten file ke dalam std::string, Mengambil nilai masing-masing field (nama, jurusan, umur, deskripsi) menggunakan fungsi lambda getValue, Hasilnya disimpan di member variabel kelas.
+
+```cpp
+void Laptop::splitData() {
+    chunks.clear();
+    chunks.push_back("NAMA:" + nama);
+    chunks.push_back("JURUSAN:" + jurusan);
+    chunks.push_back("UMUR:" + std::to_string(umur));
+
+    const size_t maxChunk = 85;
+    std::string currentChunk = "";
+    std::istringstream iss(deskripsi);
+    std::string word;
+    while (iss >> word) {
+        if (currentChunk.length() + word.length() + 1 > maxChunk) {
+            chunks.push_back("DESKRIPSI:" + currentChunk);
+            currentChunk = word;
+        } else {
+            if (!currentChunk.empty()) currentChunk += " ";
+            currentChunk += word;
+        }
+    }
+    if (!currentChunk.empty()) chunks.push_back("DESKRIPSI:" + currentChunk);
+}
+```
+Fungsi splitData() memecah data menjadi chunk, terutama deskripsi per kata dengan maksimal 85 karakter, agar mudah dikirim. Membersihkan vector chunks agar kosong sebelum digunakan, Menambahkan field NAMA, JURUSAN, dan UMUR ke dalam vector sebagai chunk, Memecah deskripsi menjadi beberapa chunk per kata agar panjang tiap chunk ≤ 85 karakter,Menambahkan setiap chunk deskripsi ke vector chunks.
+
+```cpp
+void Laptop::sendToESPBridge() {
+    HANDLE hSerial = CreateFile("COM6", GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    for (const auto& chunk : chunks) {
+        DWORD bytesWritten;
+        WriteFile(hSerial, (chunk + "\n").c_str(), chunk.size()+1, &bytesWritten, NULL);
+        Sleep(100);
+    }
+    CloseHandle(hSerial);
+}
+```
+Fungsi sendToESPBridge() mengirim setiap chunk ke ESP-Bridge melalui COM port, dengan newline untuk pemisah. Membuka COM port untuk komunikasi serial dengan ESP-Bridge. Memeriksa apakah port berhasil dibuka. Jika gagal, menampilkan error. Mengirim setiap chunk dari vector chunks ke ESP-Bridge. Memberikan delay singkat agar ESP-Bridge bisa menerima data dengan stabil. Menutup COM port setelah pengiriman selesai.
+
+**main.cpp**
+Alur kerja:
+1.Inisialisasi objek Laptop dengan file JSON yang sudah dibuat (data/data.json).
+2.Panggil readJSON() untuk membaca file dan mengambil field nama, jurusan, umur, dan deskripsi.
+3.Panggil splitData() untuk memecah data menjadi beberapa chunk agar deskripsi panjang tetap terjaga per kata ≤ 85 karakter.
+4.Panggil sendToESPBridge() untuk mengirim seluruh chunk ke ESP-Bridge via COM port.
+```cpp
+#include "Laptop.h"
+
+int main() {
+    Laptop laptop("data/data.json");  // Buat objek Laptop dengan file JSON
+
+    laptop.readJSON();    // Baca file JSON dan ambil semua field
+    laptop.splitData();   // Pecah data menjadi chunk agar bisa dikirim
+    laptop.sendToESPBridge();  // Kirim chunk ke ESP-Bridge via serial
+    
+    return 0;
+}
+```
+# Bagian Esp Bridge
+**EspBridge.h**
+```cpp
+#ifndef ESPBRIDGE_H
+#define ESPBRIDGE_H
+```
+Mencegah file header di-include lebih dari sekali dalam satu proyek, menghindari error duplikasi.
+```cpp
+#include <Arduino.h>
+#include <WiFi.h>
+#include <esp_now.h>
+```
+Arduino.h → menyediakan fungsi dasar Arduino, termasuk Serial.
+WiFi.h → digunakan untuk mengatur mode WiFi ESP32.
+esp_now.h → protokol ESP-NOW, digunakan untuk komunikasi satu arah ke ESP-Receiver.
+```cpp
+class ESPBridge {
+private:
+    uint8_t receiver_mac[6]; // MAC ESP-Receiver
+    void sendESPNow(const String &msg); // Kirim chunk via ESP-NOW
+
+public:
+    void begin();          // Inisialisasi Serial & ESP-NOW
+    void receiveSerial();  // Baca chunk dari laptop dan teruskan
+};
+```
+a. Private 
+receiver_mac[6] → menyimpan MAC address ESP-Receiver, sebagai tujuan pengiriman ESP-NOW.
+sendESPNow(const String &msg) → fungsi internal untuk mengirim satu chunk ke ESP-Receiver. Hanya bisa dipanggil dari dalam kelas.
+b. Public 
+begin() → Menyalakan serial monitor (Serial.begin) untuk debugging dan komunikasi dengan laptop. Mengatur ESP32 ke mode WiFi STA. Menginisialisasi ESP-NOW. Menambahkan peer (ESP-Receiver) dengan MAC yang telah disimpan.
+receiveSerial() → Mengecek serial buffer. Membaca tiap karakter hingga menemukan \n sebagai penanda akhir chunk. Memanggil sendESPNow() untuk meneruskan chunk ke ESP-Receiver.
+
+**main.cpp**
+```cpp
+ESPBridge bridge;
+```
+Membuat objek bridge dari kelas ESPBridge yang digunakan untuk memanggil fungsi-fungsi seperti begin() dan receiveSerial().
+```cpp
+void ESPBridge::begin() {
+    Serial.begin(115200);
+    WiFi.mode(WIFI_STA);
+
+    // Set MAC ESP-Receiver 
+    receiver_mac[0] = 0x44;
+    receiver_mac[1] = 0x1D;
+    receiver_mac[2] = 0x64;
+    receiver_mac[3] = 0xF6;
+    receiver_mac[4] = 0xD3;
+    receiver_mac[5] = 0x70;
+
+    if (esp_now_init() != ESP_OK) {
+        Serial.println("ESP-NOW init gagal!");
+        return;
+    }
+
+    esp_now_peer_info_t peerInfo = {};
+    memcpy(peerInfo.peer_addr, receiver_mac, 6);
+    peerInfo.channel = 0;
+    peerInfo.encrypt = false;
+
+    if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+        Serial.println("Gagal menambahkan peer");
+        return;
+    }
+
+    Serial.println("ESP-Bridge siap mengirim ke Receiver");
+}
+```
+Fungsi ini dijalankan sekali saat ESP-Bridge dinyalakan.
+1.Serial.begin(115200) → memulai komunikasi serial dengan baud rate 115200 untuk debugging.
+2.WiFi.mode(WIFI_STA) → ESP32 menjadi station mode, hanya bisa menerima/mengirim data ke perangkat lain.
+3.MAC address → menyimpan MAC ESP-Receiver tujuan pengiriman ESP-NOW.
+4.esp_now_init() → inisialisasi ESP-NOW.
+5.esp_now_add_peer() → menambahkan peer tujuan agar bisa dikirim data.
+```cpp
+void ESPBridge::receiveSerial() {
+    static String line = "";
+    while (Serial.available()) {
+        char c = Serial.read();
+        if (c == '\n') {
+            if (line.length() > 0) {
+                Serial.println("Meneruskan: " + line);
+                sendESPNow(line);
+                line = "";
+            }
+        } else {
+            line += c;
+        }
+    }
+}
+```
+Mengecek apakah ada data masuk di serial port.Membaca karakter satu per satu, menyusun menjadi satu line hingga menemukan \n. Setelah \n, panggil sendESPNow(line) untuk meneruskan data ke ESP-Receiver. line dikosongkan untuk chunk berikutnya.
+```cpp
+void ESPBridge::sendESPNow(const String &msg) {
+    esp_err_t result = esp_now_send(receiver_mac, (uint8_t *)msg.c_str(), msg.length());
+    if (result == ESP_OK) {
+        Serial.println("Chunk terkirim ke Receiver!");
+    } else {
+        Serial.println("Gagal kirim chunk");
+    }
+}
+```
+Fungsi ini mengirim data ke ESP-Receiver menggunakan ESP-NOW dan menampilkan status pengiriman di serial monitor, untuk memudahkan debugging.
+```cpp
 void setup() {
-    Serial.begin(115200);  
-    Serial.println("Menyalakan ESP-NOW");
-    mulai_esp_now(mac_index_ku);  
-
-    // TODO 1: Cetak nama pengguna sesuai MAC index
-    Serial.println(mac_index_to_names(mac_index_ku));  
-    Serial.println("Menunggu perintah...");
+    bridge.begin();
 }
 
 void loop() {
-    if (Serial.available()) {  
-        baca_serial(callback_data_serial);  
+    bridge.receiveSerial();
+}
+```
+setup() → memanggil bridge.begin() untuk menyiapkan ESP-Bridge.
+loop() → terus-menerus memanggil bridge.receiveSerial() untuk mengecek dan meneruskan data dari laptop.
+
+# Bagian Esp Receiver
+**EspReceiver.h**
+Alur Kerja
+Menyediakan struktur data (Chunk) untuk menyimpan potongan data.
+Mendefinisikan kelas ESPReceiver dengan fungsi untuk:
+Inisialisasi ESP32 dan ESP-NOW (begin)
+Menangani setiap paket yang diterima (onDataReceived)
+Menyusun dan menampilkan data akhir (printJSON)
+Header ini hanya mendeklarasikan semua fungsi dan struktur.
+
+```cpp
+#include <Arduino.h>
+#include <esp_now.h>
+#include <WiFi.h>
+#include <vector>
+```
+Arduino.h → untuk fungsi dasar Arduino (Serial, String, dll).
+esp_now.h → untuk komunikasi ESP-NOW.
+WiFi.h → untuk mengatur mode WiFi ESP32.
+vector → untuk menampung chunk data yang diterima.
+```cpp
+struct Chunk {
+    int number;
+    String data;
+};
+```
+Chunk digunakan untuk menyimpan satu potongan data dari ESP-Bridge.
+number → nomor urut chunk, berguna jika pengurutan perlu dipastikan.
+data → isi chunk (misal “NAMA:Africha Sekar Wangi”).
+```cpp
+class ESPReceiver {
+private:
+    std::vector<Chunk> chunks;
+    void parseMessage(const String &msg);
+
+public:
+    void begin();                      
+    void onDataReceived(const uint8_t *mac_addr, const uint8_t *data, int len);
+    void printJSON();                  
+};
+```
+Private:
+chunks → menyimpan semua chunk yang diterima sampai data lengkap siap ditampilkan.
+parseMessage() → fungsi internal untuk memproses pesan dari ESP-Bridge menjadi Chunk.
+Public:
+begin() → inisialisasi ESP-NOW, WiFi, dan siap menerima data.
+onDataReceived() → callback untuk menerima data ESP-NOW, memanggil parseMessage().
+printJSON() → menyusun seluruh chunk menjadi satu output JSON lengkap, lalu menampilkannya di serial monitor.
+
+**main.cpp**
+Alur Kerja
+1.ESP-Receiver diinisialisasi (WiFi + ESP-NOW).
+2.Menerima paket dari ESP-Bridge secara asinkron.
+3.Setiap paket di-parse dan disimpan sebagai Chunk.
+4.Jika paket terakhir diterima (|END), semua chunk digabung dan ditampilkan sebagai JSON di serial monitor.
+5.Vector chunks dikosongkan untuk batch berikutnya.
+
+```cpp
+#include "ESPReceiver.h"
+ESPReceiver receiver;
+```
+#include "ESPReceiver.h" → memanggil deklarasi kelas ESPReceiver dan Chunk.
+ESPReceiver receiver; → membuat instance ESPReceiver yang akan mengelola penerimaan data dan penyusunan JSON.
+```cpp
+void onData(const uint8_t *mac_addr, const uint8_t *data, int len) {
+    receiver.onDataReceived(mac_addr, data, len);
+}
+```
+Fungsi ini digunakan oleh ESP-NOW untuk memproses setiap paket yang diterima. Memanggil metode onDataReceived dari instance receiver untuk parsing dan penyimpanan chunk.
+```cpp
+void ESPReceiver::begin() {
+    Serial.begin(115200);
+    WiFi.mode(WIFI_STA);
+
+    if (esp_now_init() != ESP_OK) {
+        Serial.println("ESP-NOW gagal diinisialisasi");
+        return;
+    }
+
+    esp_now_register_recv_cb([](const uint8_t *mac, const uint8_t *data, int len) {
+        receiver.onDataReceived(mac, data, len);
+    });
+
+    Serial.println("ESP-Receiver siap menerima data");
+}
+```
+Serial.begin(115200) → inisialisasi serial monitor untuk debugging.
+WiFi.mode(WIFI_STA) → ESP dijadikan station (client) agar bisa menggunakan ESP-NOW.
+esp_now_init() → menginisialisasi ESP-NOW, jika gagal akan keluar.
+esp_now_register_recv_cb() → mendaftarkan callback untuk setiap paket yang masuk. Callback memanggil onDataReceived.
+```cpp
+void ESPReceiver::parseMessage(const String &msg) {
+    int sep = msg.indexOf('|');
+    if (sep != -1) {
+        Chunk c;
+        c.number = msg.substring(0, sep).toInt();
+        c.data = msg.substring(sep + 1);
+        chunks.push_back(c);
+        Serial.println("Chunk terkirim ke Receiver!");
     }
 }
 ```
-### TODO 1 - Cetak Nama Pengguna
-1. Di dalam file main.h, terdapat array mac_addresses yang memuat daftar alamat MAC untuk setiap perangkat. Setiap alamat MAC dikaitkan dengan nama pemilik atau identitas perangkat melalui array mac_names.
-2. Pilih alamat MAC yang digunakan untuk perangkat ini yaitu alamat MAC ke-4 dengan nilai
-   `{0x24, 0x0A, 0xC4, 0x0A, 0x10, 0x11}`yang sesuai dengan nama saya yaitu "Africha Sekar Wangi".
-3. Panggil fungsi `mulai_esp_now(mac_index_ku)` untuk menginisialisasi ESP-NOW dengan alamat MAC yang telah dipilih.
-4. Gunakan fungsi mac_index_to_names(int mac_index) untuk mengonversi indeks MAC menjadi nama perangkat
-5. Tampilkan nama perangkat di serial monitor.
-   
+Memisahkan nomor urut dan isi chunk dari pesan yang diterima.
+Menyimpan chunk ke chunks untuk nanti disusun kembali.
+Memberikan info di serial monitor setiap kali chunk diterima.
 ```cpp
-Serial.println(mac_index_to_names(mac_index_ku));
-```
-Output yang diharapkan berupa
-`Africha Sekar Wangi`
+void ESPReceiver::onDataReceived(const uint8_t *mac_addr, const uint8_t *data, int len) {
+    String msg = "";
+    for (int i = 0; i < len; i++) msg += (char)data[i];
 
-## utility.cpp
-- Di dalam file ini mengandung fungsi pendukung utama untuk:
-- Membaca data dari Serial
-- Memproses perintah yang diterima baik dari Serial maupun ESP-NOW
-- Mengatur callback penerimaan dan pengiriman data ESP-NOW
+    parseMessage(msg);
 
-### TODO 2 - Baca Serial
-1. Gunakan `static uint8_t buffer[BUFFER_SIZE]` untuk menyimpan data yang masuk.
-2. Gunakan `static int index` untuk menandai posisi byte berikutnya dalam buffer.
-3. Cek header paket: 3 byte pertama harus `0xFF, 0xFF, 0x00.`
-4. Byte ke-4 menandai panjang payload data.
-5. Setelah seluruh paket diterima, panggil callback dengan payload data.
-6. Reset buffer jika header salah atau buffer penuh (overflow).
-
-**KODE**
-```cpp
-void baca_serial(void (*callback)(const uint8_t *data, int len)) {
-    // TODO 2: implementasi kode buat nerima perintah dari serial
-    static uint8_t buffer[BUFFER_SIZE];   //menyimpan data yang masuk dari Serial
-    static int index = 0;   //Index saat ini dalam buffer (berapa byte yang sudah diterima)
-
-    while (Serial.available()) {
-        uint8_t byte_in = Serial.read();  
-        buffer[index++] = byte_in; 
-
-        if (index >= 4) {
-            // Cek kalau sudah ada minimal 4 byte (header 3 byte + panjang data 1 byte)
-            if (buffer[0] == 0xFF && buffer[1] == 0xFF && buffer[2] == 0x00) {
-                // Cek apakah 3 byte pertama adalah HEADER yang benar
-                uint8_t panjang_data = buffer[3]; 
-                int total_paket = 4 + panjang_data; // Total paket = 3 byte header + 1 byte panjang data + byte data 
-
-                if (index >= total_paket) {
-                    callback(&buffer[4], panjang_data);
-                    index = 0;
-                }
-            } else {
-                index = 0;
-            }
-        }
-
-        if (index >= BUFFER_SIZE) index = 0;
+    if (msg.endsWith("|END")) {
+        printJSON();
+        chunks.clear();
     }
 }
 ```
-### TODO 3 - Proses Perintah
-1. `data[0]` → perintah: HALO, CEK, JAWAB
-2. `data[1]` → index MAC tujuan (jika tersedia)
-3. Tentukan `nama_asal`:
-   - Dari ESP → gunakan `mac_index_to_names(index_mac_address_asal)`
-   - Dari Serial → tampilkan "Laptop"
-4. Tentukan `nama_tujuan`:
-   - Jika index valid → gunakan `mac_names[index_tujuan]`
-   - Jika tidak valid → "Unknown"
-5. Gunakan `strcpy((char *)&kirim[1], pesan.c_str())` untuk menyalin string ke buffer ESP-NOW.
-6. Kirim paket menggunakan `esp_now_send()`, panjang paket = `1 + pesan.length()` (+1 untuk byte perintah di index 0)
-7. Tampilkan pesan di Serial jika perintah adalah JAWAB.
-
-**KODE**
+Mengubah data mentah menjadi String.
+Memanggil parseMessage untuk menambahkan ke vector chunk.
+Jika pesan menandakan akhir data (|END), maka:
+Memanggil printJSON() untuk menyusun dan menampilkan JSON lengkap.
+Membersihkan vector chunks untuk data berikutnya.
 ```cpp
-void process_perintah(const uint8_t *data, int len, int index_mac_address_asal) {
-    // TODO 3: implementasi kode buat processing perintah
-    uint8_t command = data[0];  // byte pertama = jenis perintah
-    int index_tujuan = (len > 1) ? data[1] : -1; // byte kedua = tujuan
+void ESPReceiver::printJSON() {
+    String fullData = "";
+    for (auto &c : chunks) fullData += c.data;
 
-    String nama_asal = (index_mac_address_asal == -1) ? "Laptop" : mac_index_to_names(index_mac_address_asal);
-    String nama_tujuan = (index_tujuan >= 0 && index_tujuan < MAC_ADDRESS_TOTAL) ? mac_names[index_tujuan] : "Unknown";
+    Serial.println("[KONTEN FILE YANG DITERIMA]");
 
-    switch (command) {
-        case HALO: {
-            if (index_mac_address_asal == -1) {
-                // Dari serial (Laptop)
-                String pesan = "Halo " + nama_tujuan + " Aku " + String(mac_names[mac_index_ku]);
-                uint8_t kirim[BUFFER_SIZE];
-                kirim[0] = HALO;
-                strcpy((char *)&kirim[1], pesan.c_str());
-                esp_now_send(mac_addresses[index_tujuan], kirim, 1 + pesan.length());
-            } else {
-                // Dari ESP-NOW
-                String pesan = "Halo Juga " + nama_asal + " Aku " + String(mac_names[mac_index_ku]);
-                uint8_t kirim[BUFFER_SIZE];
-                kirim[0] = JAWAB;
-                strcpy((char *)&kirim[1], pesan.c_str());
-                esp_now_send(mac_addresses[index_mac_address_asal], kirim, 1 + pesan.length());
-            }
-            break;
-        }
+    int n1 = fullData.indexOf("\"nama\":");
+    int n2 = fullData.indexOf(",", n1);
+    int j1 = fullData.indexOf("\"jurusan\":");
+    int j2 = fullData.indexOf(",", j1);
+    int u1 = fullData.indexOf("\"umur\":");
+    int u2 = fullData.indexOf(",", u1);
+    int d1 = fullData.indexOf("\"deskripsi\":");
+    int d2 = fullData.indexOf("}", d1);
 
-        case CEK: {
-            if (index_mac_address_asal == -1) {
-                // Dari Serial
-                String pesan = nama_tujuan + String(" ini ") + String(mac_names[mac_index_ku]) + " apa kamu disana?";
-                uint8_t kirim[BUFFER_SIZE];
-                kirim[0] = CEK;
-                strcpy((char *)&kirim[1], pesan.c_str());
-                esp_now_send(mac_addresses[index_tujuan], kirim, 1 + pesan.length());
-            } else {
-                // Dari ESP-NOW
-                String pesan = "Iya Aku " + nama_asal + " Disini - " + String(mac_names[mac_index_ku]);
-                uint8_t kirim[BUFFER_SIZE];
-                kirim[0] = JAWAB;
-                strcpy((char *)&kirim[1], pesan.c_str());
-                esp_now_send(mac_addresses[index_mac_address_asal], kirim, 1 + pesan.length());
-            }
-            break;
-        }
-
-        case JAWAB: {
-            // Hanya dari ESP-NOW, tampilkan di Serial
-            String pesan = String((char *)&data[1]);
-            Serial.println("Pesan diterima: " + pesan);
-            break;
-        }
-
-        default:
-            Serial.println("Perintah tidak dikenali!");
-            break;
-    }
+    Serial.print("NAMA: "); Serial.println(fullData.substring(n1 + 8, n2 - 1));
+    Serial.print("JURUSAN: "); Serial.println(fullData.substring(j1 + 11, j2 - 1));
+    Serial.print("UMUR: "); Serial.println(fullData.substring(u1 + 7, u2));
+    Serial.print("DESKRIPSI DIRI: "); Serial.println(fullData.substring(d1 + 14, d2 - 1));
 }
 ```
+Menggabungkan semua chunk menjadi satu string fullData.
+Mencari posisi masing-masing field JSON (nama, jurusan, umur, deskripsi).
+Menampilkan hasil akhir di serial monitor sesuai format ketentuan:
+`
+[KONTEN FILE YANG DITERIMA]
+NAMA: ...
+JURUSAN: ...
+UMUR: ...
+DESKRIPSI DIRI: ...`
+```cpp
+void setup() {
+    receiver.begin();
+}
+
+void loop() {
+    // Kosong, semua berjalan via callback ESP-NOW
+}
+```
+setup() → memanggil receiver.begin() untuk memulai serial, WiFi, dan ESP-NOW.
+loop() → kosong, karena seluruh proses penerimaan berjalan asinkron via callback.
