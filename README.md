@@ -4,7 +4,8 @@
 Program ini dibuat untuk mentransfer file JSON dari laptop ke ESP-Receiver melalui ESP-Bridge menggunakan ESP-NOW. Program harus memecah file JSON menjadi beberapa chunk agar sesuai batasan ESP-NOW 250 byte per packet, kemudian menyusun kembali di ESP-Receiver dan menampilkan data ke serial monitor.
 
 ## Struktur proyek
-`try task-4
+`
+try task-4
 │
 ├── .vscode/
 │   ├── c_cpp_properties.json
@@ -43,7 +44,8 @@ Program ini dibuat untuk mentransfer file JSON dari laptop ke ESP-Receiver melal
 │   └── CMakeLists.txt
 │
 └── lib/
-    └── README`
+    └── README
+`
     
 # Alur Program
 Laptop:
