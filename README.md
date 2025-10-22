@@ -189,9 +189,9 @@ Fungsi `sendToESPBridge()` yaitu membuka COM port untuk komunikasi serial dengan
 **main.cpp**
 Alur kerja:
 1. Inisialisasi objek Laptop dengan file JSON yang sudah dibuat (data/data.json).
-2. Panggil readJSON() untuk membaca file dan mengambil field nama, jurusan, umur, dan deskripsi.
-3. Panggil splitData() untuk memecah data menjadi beberapa chunk agar deskripsi panjang tetap terjaga per kata ≤ 85 karakter.
-4. Panggil sendToESPBridge() untuk mengirim seluruh chunk ke ESP-Bridge via COM port.
+2. Panggil `readJSON()` untuk membaca file dan mengambil field nama, jurusan, umur, dan deskripsi.
+3. Panggil `splitData()` untuk memecah data menjadi beberapa chunk agar deskripsi panjang tetap terjaga per kata ≤ 85 karakter.
+4. Panggil `sendToESPBridge()` untuk mengirim seluruh chunk ke ESP-Bridge via COM port.
 ```cpp
 #include "Laptop.h"
 
@@ -233,7 +233,7 @@ public:
 ```
 - a. Private 
   - `receiver_mac[6]` → menyimpan MAC address ESP-Receiver, sebagai tujuan pengiriman ESP-NOW.
-  - sendESPNow(const String &msg) → fungsi internal untuk mengirim satu chunk ke ESP-Receiver dan hanya bisa dipanggil dari dalam kelas.
+  - `sendESPNow(const String &msg)` → fungsi internal untuk mengirim satu chunk ke ESP-Receiver dan hanya bisa dipanggil dari dalam kelas.
 - b. Public
   - `begin()` → menyalakan serial monitor (Serial.begin) untuk debugging dan komunikasi dengan laptop, mengatur ESP32 ke mode WiFi STA, menginisialisasi ESP-NOW, dan menambahkan peer (ESP-Receiver) dengan MAC yang telah disimpan.
   - `receiveSerial()` → mengecek serial buffer, membaca tiap karakter hingga menemukan \n sebagai penanda akhir chunk, dan memanggil sendESPNow() untuk meneruskan chunk ke ESP-Receiver.
@@ -363,11 +363,11 @@ public:
 };
 ```
 - Private:
-  - chunks → menyimpan semua chunk yang diterima sampai data lengkap siap ditampilkan.
-  - parseMessage() → fungsi internal untuk memproses pesan dari ESP-Bridge menjadi Chunk.
+  - `chunks` → menyimpan semua chunk yang diterima sampai data lengkap siap ditampilkan.
+  - `parseMessage()` → fungsi internal untuk memproses pesan dari ESP-Bridge menjadi Chunk.
 - Public:
   - `begin()` → inisialisasi ESP-NOW, WiFi, dan siap menerima data.
-  - `onDataReceived()` → callback untuk menerima data ESP-NOW, memanggil parseMessage().
+  - `onDataReceived()` → callback untuk menerima data ESP-NOW, memanggil `parseMessage()`.
   - `printJSON()` → menyusun seluruh chunk menjadi satu output JSON lengkap, lalu menampilkannya di serial monitor.
 
 **main.cpp**
@@ -382,8 +382,8 @@ Alur Kerja
 #include "ESPReceiver.h"
 ESPReceiver receiver;
 ```
-#include "ESPReceiver.h" → memanggil deklarasi kelas ESPReceiver dan Chunk.
-ESPReceiver receiver; → membuat instance ESPReceiver yang akan mengelola penerimaan data dan penyusunan JSON.
+- `#include "ESPReceiver.h"` → memanggil deklarasi kelas ESPReceiver dan Chunk.
+- `ESPReceiver receiver` membuat instance ESPReceiver yang akan mengelola penerimaan data dan penyusunan JSON.
 ```cpp
 void onData(const uint8_t *mac_addr, const uint8_t *data, int len) {
     receiver.onDataReceived(mac_addr, data, len);
@@ -469,12 +469,13 @@ void ESPReceiver::printJSON() {
 - Menggabungkan semua chunk menjadi satu string fullData.
 - Mencari posisi masing-masing field JSON (nama, jurusan, umur, deskripsi).
 - Menampilkan hasil akhir di serial monitor sesuai format ketentuan:
-`
+``cpp
 [KONTEN FILE YANG DITERIMA]
 NAMA: ...
 JURUSAN: ...
 UMUR: ...
-DESKRIPSI DIRI: ...`
+DESKRIPSI DIRI: ...
+```
 ```cpp
 void setup() {
     receiver.begin();
