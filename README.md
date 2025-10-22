@@ -14,13 +14,56 @@ file .json pada proyek bernama data.json yang value deskripsi harus memiliki kat
 }
 ```
 Setelah esp-receiver selesai menyusun data dari ESP-NOW, esp-receiver menampilkan data ke serial monitor dengan format:
-`
+```cpp
 [KONTEN FILE YANG DITERIMA]
 NAMA: ...
 JURUSAN: ...
 UMUR: ...
-DESKRIPSI DIRI: ...`
-
+DESKRIPSI DIRI: ...
+```
+## Struktur proyek
+```cpp
+try task-4
+│
+├── .vscode/
+│   ├── c_cpp_properties.json
+│   ├── extensions.json
+│   └── launch.json
+│
+├── EspBridge/
+│   ├── pio/
+│   ├── .vscode/
+│   ├── src/
+│   │   ├── EspBridge.h
+│   │   └── main.cpp
+│   ├── .gitignore
+│   └── platformio.ini
+│
+├── EspReceiver/
+│   ├── pio/
+│   ├── .vscode/
+│   ├── src/
+│   │   ├── EspReceiver.h
+│   │   └── main.cpp
+│   ├── .gitignore
+│   └── platformio.ini
+│
+├── include/
+│   └── README
+│
+├── laptop/
+│   ├── build/
+│   ├── data/
+│   │   └── data.json
+│   ├── src/
+│   │   ├── Laptop.h
+│   │   ├── Laptop.cpp
+│   │   └── main.cpp
+│   └── CMakeLists.txt
+│
+└── lib/
+    └── README
+```
 # Alur Program
 Laptop:
 - Membaca JSON dari `data.json` menggunakan `Laptop::readJSON()`.
