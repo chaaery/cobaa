@@ -231,12 +231,12 @@ public:
     void receiveSerial();  // Baca chunk dari laptop dan teruskan
 };
 ```
-a. Private 
-`receiver_mac[6]` → menyimpan MAC address ESP-Receiver, sebagai tujuan pengiriman ESP-NOW.
-sendESPNow(const String &msg) → fungsi internal untuk mengirim satu chunk ke ESP-Receiver dan hanya bisa dipanggil dari dalam kelas.
-b. Public 
-`begin()` → menyalakan serial monitor (Serial.begin) untuk debugging dan komunikasi dengan laptop, mengatur ESP32 ke mode WiFi STA, menginisialisasi ESP-NOW, dan menambahkan peer (ESP-Receiver) dengan MAC yang telah disimpan.
-receiveSerial() → mengecek serial buffer, membaca tiap karakter hingga menemukan \n sebagai penanda akhir chunk, dan memanggil sendESPNow() untuk meneruskan chunk ke ESP-Receiver.
+- a. Private 
+  - `receiver_mac[6]` → menyimpan MAC address ESP-Receiver, sebagai tujuan pengiriman ESP-NOW.
+  - sendESPNow(const String &msg) → fungsi internal untuk mengirim satu chunk ke ESP-Receiver dan hanya bisa dipanggil dari dalam kelas.
+- b. Public
+  - `begin()` → menyalakan serial monitor (Serial.begin) untuk debugging dan komunikasi dengan laptop, mengatur ESP32 ke mode WiFi STA, menginisialisasi ESP-NOW, dan menambahkan peer (ESP-Receiver) dengan MAC yang telah disimpan.
+  - `receiveSerial()` → mengecek serial buffer, membaca tiap karakter hingga menemukan \n sebagai penanda akhir chunk, dan memanggil sendESPNow() untuk meneruskan chunk ke ESP-Receiver.
 
 **main.cpp**
 ```cpp
