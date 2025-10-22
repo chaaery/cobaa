@@ -146,7 +146,7 @@ void Laptop::readJSON() {
     deskripsi = getValue("deskripsi");
 }
 ```
-Fungsi `readJSON()` yaitu membuka file JSON apabila gagal akan menampilkan error, membaca seluruh konten file ke dalam `std::string`, mengambil nilai masing-masing field (nama, jurusan, umur, deskripsi) menggunakan fungsi lambda getValue kemudian ghsilnya disimpan di member variabel kelas.
+Fungsi `readJSON()` yaitu membuka file JSON apabila gagal akan menampilkan error, membaca seluruh konten file ke dalam `std::string`, mengambil nilai masing-masing field (nama, jurusan, umur, deskripsi) menggunakan fungsi `getValue` kemudian hasilnya disimpan.
 
 ```cpp
 void Laptop::splitData() {
@@ -469,7 +469,7 @@ void ESPReceiver::printJSON() {
 - Menggabungkan semua chunk menjadi satu string fullData.
 - Mencari posisi masing-masing field JSON (nama, jurusan, umur, deskripsi).
 - Menampilkan hasil akhir di serial monitor sesuai format ketentuan:
-``cpp
+```cpp
 [KONTEN FILE YANG DITERIMA]
 NAMA: ...
 JURUSAN: ...
